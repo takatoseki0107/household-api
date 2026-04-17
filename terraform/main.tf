@@ -99,7 +99,7 @@ resource "aws_lambda_function" "household" {
   source_code_hash = filebase64sha256("${path.module}/../lambda.zip")
 
   tags = {
-    Name        = "household-api"
+    Name        = "household-api-${var.environment}"
     Environment = var.environment
   }
 }
@@ -116,10 +116,24 @@ resource "aws_apigatewayv2_integration" "household" {
   payload_format_version = "2.0"
 }
 
+resource "aws_apigatewayv2_authorizer" "household" {
+  api_id           = aws_apigatewayv2_api.household.id
+  authorizer_type  = "JWT"
+  identity_sources = ["$request.header.Authorization"]
+  name             = "household-cognito-authorizer"
+
+  jwt_configuration {
+    audience = [aws_cognito_user_pool_client.household.id]
+    issuer   = "https://cognito-idp.ap-northeast-1.amazonaws.com/${aws_cognito_user_pool.household.id}"
+  }
+}
+
 resource "aws_apigatewayv2_route" "household" {
-  api_id    = aws_apigatewayv2_api.household.id
-  route_key = "GET /"
-  target    = "integrations/${aws_apigatewayv2_integration.household.id}"
+  api_id             = aws_apigatewayv2_api.household.id
+  route_key          = "GET /"
+  target             = "integrations/${aws_apigatewayv2_integration.household.id}"
+  authorization_type = "JWT"
+  authorizer_id      = aws_apigatewayv2_authorizer.household.id
 }
 
 resource "aws_apigatewayv2_stage" "household" {

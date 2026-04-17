@@ -7,3 +7,4 @@ def handler(event, context):
         "headers": {"Content-Type": "application/json"},
         "body": json.dumps({"message": "家計管理APIへようこそ！"}),
     }
+    
