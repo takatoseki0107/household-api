@@ -6,3 +6,4 @@ venv/
 .terraform.lock.hcl
 *.tfstate
 *.tfstate.backup
+lambda.zip
