@@ -28,6 +28,9 @@ resource "aws_dynamodb_table" "household" {
     name = "transactionId"
     type = "S"
   }
+  point_in_time_recovery {
+    enabled = true
+  }
 
   tags = {
     Name        = "household-transactions"
