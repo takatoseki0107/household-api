@@ -12,6 +12,7 @@ provider "aws" {
   region  = "ap-northeast-1"
   profile = "terraform"
 }
+
 resource "aws_dynamodb_table" "household" {
   name         = "household-transactions"
   billing_mode = "PAY_PER_REQUEST"
