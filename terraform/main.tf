@@ -28,6 +28,7 @@ resource "aws_dynamodb_table" "household" {
     name = "transactionId"
     type = "S"
   }
+
   point_in_time_recovery {
     enabled = true
   }
@@ -39,20 +40,20 @@ resource "aws_dynamodb_table" "household" {
 }
 
 resource "aws_cognito_user_pool" "household" {
-  name = "household-user-pool"
+  name = "household-user-pool-${var.environment}"
 
   password_policy {
-    minimum_length    = 8
+    minimum_length    = 12
     require_uppercase = true
     require_lowercase = true
     require_numbers   = true
-    require_symbols   = false
+    require_symbols   = true
   }
 
   auto_verified_attributes = ["email"]
 
   tags = {
-    Name        = "household-user-pool"
+    Name        = "household-user-pool-${var.environment}"
     Environment = var.environment
   }
 }
@@ -62,7 +63,7 @@ resource "aws_cognito_user_pool_client" "household" {
   user_pool_id = aws_cognito_user_pool.household.id
 
   explicit_auth_flows = [
-    "ALLOW_USER_PASSWORD_AUTH",
+    "ALLOW_USER_SRP_AUTH",
     "ALLOW_REFRESH_TOKEN_AUTH",
   ]
 }
