@@ -67,3 +67,85 @@ resource "aws_cognito_user_pool_client" "household" {
     "ALLOW_REFRESH_TOKEN_AUTH",
   ]
 }
+
+resource "aws_iam_role" "lambda" {
+  name = "household-lambda-role-${var.environment}"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Action = "sts:AssumeRole"
+        Effect = "Allow"
+        Principal = {
+          Service = "lambda.amazonaws.com"
+        }
+      }
+    ]
+  })
+}
+
+resource "aws_iam_role_policy_attachment" "lambda_basic" {
+  role       = aws_iam_role.lambda.name
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+}
+
+resource "aws_lambda_function" "household" {
+  filename         = "${path.module}/../lambda.zip"
+  function_name    = "household-api-${var.environment}"
+  role             = aws_iam_role.lambda.arn
+  handler          = "main.handler"
+  runtime          = "python3.12"
+  source_code_hash = filebase64sha256("${path.module}/../lambda.zip")
+
+  tags = {
+    Name        = "household-api-${var.environment}"
+    Environment = var.environment
+  }
+}
+
+resource "aws_apigatewayv2_api" "household" {
+  name          = "household-api-${var.environment}"
+  protocol_type = "HTTP"
+}
+
+resource "aws_apigatewayv2_integration" "household" {
+  api_id                 = aws_apigatewayv2_api.household.id
+  integration_type       = "AWS_PROXY"
+  integration_uri        = aws_lambda_function.household.invoke_arn
+  payload_format_version = "2.0"
+}
+
+resource "aws_apigatewayv2_authorizer" "household" {
+  api_id           = aws_apigatewayv2_api.household.id
+  authorizer_type  = "JWT"
+  identity_sources = ["$request.header.Authorization"]
+  name             = "household-cognito-authorizer"
+
+  jwt_configuration {
+    audience = [aws_cognito_user_pool_client.household.id]
+    issuer   = "https://cognito-idp.ap-northeast-1.amazonaws.com/${aws_cognito_user_pool.household.id}"
+  }
+}
+
+resource "aws_apigatewayv2_route" "household" {
+  api_id             = aws_apigatewayv2_api.household.id
+  route_key          = "GET /"
+  target             = "integrations/${aws_apigatewayv2_integration.household.id}"
+  authorization_type = "JWT"
+  authorizer_id      = aws_apigatewayv2_authorizer.household.id
+}
+
+resource "aws_apigatewayv2_stage" "household" {
+  api_id      = aws_apigatewayv2_api.household.id
+  name        = "$default"
+  auto_deploy = true
+}
+
+resource "aws_lambda_permission" "household" {
+  statement_id  = "AllowAPIGatewayInvoke"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.household.function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_apigatewayv2_api.household.execution_arn}/*/*"
+}
