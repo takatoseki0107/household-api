@@ -29,3 +29,5 @@ lambda/h11*
 lambda/sniffio*
 lambda/**/__pycache__*
 lambda/**/*.dist-info*
+lambda/idna*
+lambda/bin*
