@@ -149,3 +149,52 @@ resource "aws_lambda_permission" "household" {
   principal     = "apigateway.amazonaws.com"
   source_arn    = "${aws_apigatewayv2_api.household.execution_arn}/*/*"
 }
+resource "aws_iam_policy" "lambda_dynamodb" {
+  name = "household-lambda-dynamodb-policy-${var.environment}"
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "dynamodb:PutItem",
+          "dynamodb:GetItem",
+          "dynamodb:Query",
+          "dynamodb:UpdateItem",
+          "dynamodb:DeleteItem"
+        ]
+        Resource = aws_dynamodb_table.household.arn
+      }
+    ]
+  })
+}
+
+resource "aws_iam_role_policy_attachment" "lambda_dynamodb" {
+  role       = aws_iam_role.lambda.name
+  policy_arn = aws_iam_policy.lambda_dynamodb.arn
+}
+
+resource "aws_apigatewayv2_route" "post_transactions" {
+  api_id             = aws_apigatewayv2_api.household.id
+  route_key          = "POST /transactions"
+  target             = "integrations/${aws_apigatewayv2_integration.household.id}"
+  authorization_type = "JWT"
+  authorizer_id      = aws_apigatewayv2_authorizer.household.id
+}
+
+resource "aws_apigatewayv2_route" "get_transactions" {
+  api_id             = aws_apigatewayv2_api.household.id
+  route_key          = "GET /transactions"
+  target             = "integrations/${aws_apigatewayv2_integration.household.id}"
+  authorization_type = "JWT"
+  authorizer_id      = aws_apigatewayv2_authorizer.household.id
+}
+
+resource "aws_apigatewayv2_route" "get_transactions_summary" {
+  api_id             = aws_apigatewayv2_api.household.id
+  route_key          = "GET /transactions/summary"
+  target             = "integrations/${aws_apigatewayv2_integration.household.id}"
+  authorization_type = "JWT"
+  authorizer_id      = aws_apigatewayv2_authorizer.household.id
+}
