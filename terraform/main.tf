@@ -198,3 +198,32 @@ resource "aws_apigatewayv2_route" "get_transactions_summary" {
   authorization_type = "JWT"
   authorizer_id      = aws_apigatewayv2_authorizer.household.id
 }
+resource "aws_iam_policy" "lambda_bedrock" {
+  name = "household-lambda-bedrock-policy-${var.environment}"
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "bedrock:InvokeModel"
+        ]
+        Resource = "arn:aws:bedrock:ap-northeast-1::foundation-model/anthropic.claude-haiku-4-5-20251001"
+      }
+    ]
+  })
+}
+
+resource "aws_iam_role_policy_attachment" "lambda_bedrock" {
+  role       = aws_iam_role.lambda.name
+  policy_arn = aws_iam_policy.lambda_bedrock.arn
+}
+
+resource "aws_apigatewayv2_route" "get_advice" {
+  api_id             = aws_apigatewayv2_api.household.id
+  route_key          = "GET /transactions/advice"
+  target             = "integrations/${aws_apigatewayv2_integration.household.id}"
+  authorization_type = "JWT"
+  authorizer_id      = aws_apigatewayv2_authorizer.household.id
+}
