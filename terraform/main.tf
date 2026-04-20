@@ -8,6 +8,8 @@ terraform {
   required_version = ">= 1.0"
 }
 
+data "aws_caller_identity" "current" {}
+
 provider "aws" {
   region  = "ap-northeast-1"
   profile = var.aws_profile
@@ -136,7 +138,7 @@ resource "aws_apigatewayv2_api" "household" {
   protocol_type = "HTTP"
 
   cors_configuration {
-    allow_origins = ["*"]
+    allow_origins = var.allowed_origins
     allow_methods = ["GET", "POST", "PUT", "DELETE", "OPTIONS"]
     allow_headers = ["Content-Type", "Authorization"]
     max_age       = 300
@@ -251,7 +253,7 @@ resource "aws_iam_policy" "lambda_bedrock" {
           "bedrock:InvokeModel"
         ]
         Resource = [
-          "arn:aws:bedrock:ap-northeast-1:028973196612:inference-profile/jp.anthropic.claude-haiku-4-5-20251001-v1:0",
+          "arn:aws:bedrock:ap-northeast-1:${data.aws_caller_identity.current.account_id}:inference-profile/jp.anthropic.claude-haiku-4-5-20251001-v1:0",
           "arn:aws:bedrock:ap-northeast-1::foundation-model/anthropic.claude-haiku-4-5-20251001-v1:0",
           "arn:aws:bedrock:ap-northeast-3::foundation-model/anthropic.claude-haiku-4-5-20251001-v1:0"
         ]
@@ -324,11 +326,11 @@ resource "aws_cloudwatch_metric_alarm" "lambda_errors" {
   evaluation_periods  = 1
   metric_name         = "Errors"
   namespace           = "AWS/Lambda"
-  period              = 60
+  period              = 300
   statistic           = "Sum"
-  threshold           = 0
+  threshold           = 3
   alarm_description   = "Lambda関数でエラーが発生しました"
-  alarm_actions       = [aws_sns_topic.budget_alert.arn]
+  alarm_actions       = [aws_sns_topic.ops_alert.arn]
 
   dimensions = {
     FunctionName = aws_lambda_function.household.function_name
@@ -340,8 +342,8 @@ resource "aws_cloudwatch_metric_alarm" "lambda_errors" {
   }
 }
 
-resource "aws_cloudwatch_metric_alarm" "bedrock_errors" {
-  alarm_name          = "household-bedrock-errors-${var.environment}"
+resource "aws_cloudwatch_metric_alarm" "bedrock_invocations" {
+  alarm_name          = "household-bedrock-invocations-${var.environment}"
   comparison_operator = "GreaterThanThreshold"
   evaluation_periods  = 1
   metric_name         = "Invocations"
@@ -350,7 +352,7 @@ resource "aws_cloudwatch_metric_alarm" "bedrock_errors" {
   statistic           = "Sum"
   threshold           = 100
   alarm_description   = "Bedrock呼び出し回数が1時間で100回を超えました"
-  alarm_actions       = [aws_sns_topic.budget_alert.arn]
+  alarm_actions       = [aws_sns_topic.ops_alert.arn]
 
   dimensions = {
     ModelId = "jp.anthropic.claude-haiku-4-5-20251001-v1:0"
@@ -360,4 +362,20 @@ resource "aws_cloudwatch_metric_alarm" "bedrock_errors" {
     Name        = "household-bedrock-errors-${var.environment}"
     Environment = var.environment
   }
+}
+
+# 運用アラート（Lambdaエラー・Bedrockアラーム）用トピック
+resource "aws_sns_topic" "ops_alert" {
+  name = "household-ops-alert-${var.environment}"
+
+  tags = {
+    Name        = "household-ops-alert-${var.environment}"
+    Environment = var.environment
+  }
+}
+
+resource "aws_sns_topic_subscription" "ops_alert_email" {
+  topic_arn = aws_sns_topic.ops_alert.arn
+  protocol  = "email"
+  endpoint  = var.alert_email
 }
