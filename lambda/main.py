@@ -5,6 +5,7 @@ import boto3
 import uuid
 from datetime import datetime, timezone, timedelta
 from fastapi import FastAPI, HTTPException, Request
+from fastapi.responses import StreamingResponse
 from mangum import Mangum
 from pydantic import BaseModel
 from typing import Optional, Literal
@@ -22,6 +23,18 @@ logger.setLevel(logging.INFO)
 
 SNS_TOPIC_ARN = os.environ.get("SNS_TOPIC_ARN", "")
 BUDGET_THRESHOLD = int(os.environ.get("BUDGET_THRESHOLD") or "100000")
+BEDROCK_MODEL_ID = "jp.anthropic.claude-haiku-4-5-20251001-v1:0"
+
+# Could #13: プロンプトテンプレートを定数として管理
+ADVICE_PROMPT_TEMPLATE = """あなたは家計管理のアドバイザーです。
+以下の直近{months}ヶ月の家計データを分析して、日本語で簡潔なアドバイスを3点述べてください。
+
+収入合計: {income}円
+支出合計: {expense}円
+残高: {balance}円
+予算上限: {budget}円
+
+アドバイス:"""
 
 
 class Transaction(BaseModel):
@@ -57,7 +70,11 @@ def get_all_items(user_id: str) -> list:
 
 
 def get_recent_summary(user_id: str, months: int = 3) -> dict:
-    """直近N ヶ月の集計データのみ返す（Bedrock コスト削減）"""
+    """直近N ヶ月の集計データのみ返す（Bedrock コスト削減）
+
+    Raises:
+        ClientError: DynamoDB クエリに失敗した場合
+    """
     items = get_all_items(user_id)
     cutoff = (datetime.now(timezone.utc) - timedelta(days=months * 30)).strftime("%Y-%m-%d")
     recent = [i for i in items if i.get("date", "") >= cutoff]
@@ -150,18 +167,19 @@ def get_advice(request: Request):
     if summary["income"] == 0 and summary["expense"] == 0:
         return {"advice": "まずは収支を登録してみましょう"}
 
-    prompt = f"""あなたは家計管理のアドバイザーです。
-以下の直近{summary["months"]}ヶ月の家計データを分析して、日本語で簡潔なアドバイスを3点述べてください。
-
-収入合計: {summary["income"]:,}円
-支出合計: {summary["expense"]:,}円
-残高: {summary["balance"]:,}円
-
-アドバイス:"""
+    # Could #13: テンプレートから prompt を生成
+    prompt = ADVICE_PROMPT_TEMPLATE.format(
+        months=summary["months"],
+        income=f'{summary["income"]:,}',
+        expense=f'{summary["expense"]:,}',
+        balance=f'{summary["balance"]:,}',
+        budget=f'{BUDGET_THRESHOLD:,}',
+    )
 
     try:
-        result = bedrock.invoke_model(
-            modelId="jp.anthropic.claude-haiku-4-5-20251001-v1:0",
+        # Could #12: invoke_model_with_response_stream でストリーミング取得
+        response = bedrock.invoke_model_with_response_stream(
+            modelId=BEDROCK_MODEL_ID,
             contentType="application/json",
             accept="application/json",
             body=json.dumps({
@@ -175,8 +193,13 @@ def get_advice(request: Request):
     except ClientError:
         raise HTTPException(status_code=500, detail="サーバーエラーが発生しました")
 
-    body = json.loads(result["body"].read())
-    advice = body.get("content", [{}])[0].get("text", "アドバイスを生成できませんでした")
+    advice_parts = []
+    for event in response["body"]:
+        chunk = json.loads(event["chunk"]["bytes"])
+        if chunk.get("type") == "content_block_delta":
+            advice_parts.append(chunk["delta"].get("text", ""))
+
+    advice = "".join(advice_parts) or "アドバイスを生成できませんでした"
     return {"advice": advice}
 
 
