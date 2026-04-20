@@ -394,26 +394,4 @@ resource "aws_sns_topic_subscription" "ops_alert_email" {
   endpoint  = var.alert_email
 }
 
-resource "aws_iam_policy" "lambda_marketplace" {
-  name = "household-lambda-marketplace-policy-${var.environment}"
 
-  policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Effect = "Allow"
-        Action = [
-          "aws-marketplace:ViewSubscriptions",
-          "aws-marketplace:Subscribe",
-          "aws-marketplace:Unsubscribe"
-        ]
-        Resource = "*"
-      }
-    ]
-  })
-}
-
-resource "aws_iam_role_policy_attachment" "lambda_marketplace" {
-  role       = aws_iam_role.lambda.name
-  policy_arn = aws_iam_policy.lambda_marketplace.arn
-}
