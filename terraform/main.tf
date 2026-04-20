@@ -52,6 +52,24 @@ resource "aws_cognito_user_pool" "household" {
 
   auto_verified_attributes = ["email"]
 
+  verification_message_template {
+    default_email_option = "CONFIRM_WITH_CODE"
+    email_subject        = "【家計管理API】メールアドレスの確認"
+    email_message        = "確認コード: {####}"
+  }
+
+  # schema追加はUser Pool再作成が必要なため、新規環境でのみ有効
+  # schema {
+  #   name                     = "name"
+  #   attribute_data_type      = "String"
+  #   mutable                  = true
+  #   required                 = false
+  #   string_attribute_constraints {
+  #     min_length = 1
+  #     max_length = 50
+  #   }
+  # }
+
   tags = {
     Name        = "household-user-pool-${var.environment}"
     Environment = var.environment
@@ -100,6 +118,13 @@ resource "aws_lambda_function" "household" {
   timeout          = 30
   memory_size      = 512
 
+  environment {
+    variables = {
+      SNS_TOPIC_ARN    = aws_sns_topic.budget_alert.arn
+      BUDGET_THRESHOLD = tostring(var.budget_threshold)
+    }
+  }
+
   tags = {
     Name        = "household-api-${var.environment}"
     Environment = var.environment
@@ -109,6 +134,13 @@ resource "aws_lambda_function" "household" {
 resource "aws_apigatewayv2_api" "household" {
   name          = "household-api-${var.environment}"
   protocol_type = "HTTP"
+
+  cors_configuration {
+    allow_origins = ["*"]
+    allow_methods = ["GET", "POST", "PUT", "DELETE", "OPTIONS"]
+    allow_headers = ["Content-Type", "Authorization"]
+    max_age       = 300
+  }
 }
 
 resource "aws_apigatewayv2_integration" "household" {
@@ -142,6 +174,11 @@ resource "aws_apigatewayv2_stage" "household" {
   api_id      = aws_apigatewayv2_api.household.id
   name        = "$default"
   auto_deploy = true
+
+  default_route_settings {
+    throttling_burst_limit = 100
+    throttling_rate_limit  = 50
+  }
 }
 
 resource "aws_lambda_permission" "household" {
@@ -230,4 +267,93 @@ resource "aws_apigatewayv2_route" "get_advice" {
   target             = "integrations/${aws_apigatewayv2_integration.household.id}"
   authorization_type = "JWT"
   authorizer_id      = aws_apigatewayv2_authorizer.household.id
+}
+
+resource "aws_sns_topic" "budget_alert" {
+  name = "household-budget-alert-${var.environment}"
+
+  tags = {
+    Name        = "household-budget-alert-${var.environment}"
+    Environment = var.environment
+  }
+}
+
+resource "aws_sns_topic_subscription" "budget_alert_email" {
+  topic_arn = aws_sns_topic.budget_alert.arn
+  protocol  = "email"
+  endpoint  = var.alert_email
+}
+
+resource "aws_iam_policy" "lambda_sns" {
+  name = "household-lambda-sns-policy-${var.environment}"
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect   = "Allow"
+        Action   = ["sns:Publish"]
+        Resource = aws_sns_topic.budget_alert.arn
+      }
+    ]
+  })
+}
+
+resource "aws_iam_role_policy_attachment" "lambda_sns" {
+  role       = aws_iam_role.lambda.name
+  policy_arn = aws_iam_policy.lambda_sns.arn
+}
+
+resource "aws_cloudwatch_log_group" "lambda" {
+  name              = "/aws/lambda/household-api-${var.environment}"
+  retention_in_days = 30
+
+  tags = {
+    Name        = "household-api-logs-${var.environment}"
+    Environment = var.environment
+  }
+}
+
+resource "aws_cloudwatch_metric_alarm" "lambda_errors" {
+  alarm_name          = "household-lambda-errors-${var.environment}"
+  comparison_operator = "GreaterThanThreshold"
+  evaluation_periods  = 1
+  metric_name         = "Errors"
+  namespace           = "AWS/Lambda"
+  period              = 60
+  statistic           = "Sum"
+  threshold           = 0
+  alarm_description   = "Lambda関数でエラーが発生しました"
+  alarm_actions       = [aws_sns_topic.budget_alert.arn]
+
+  dimensions = {
+    FunctionName = aws_lambda_function.household.function_name
+  }
+
+  tags = {
+    Name        = "household-lambda-errors-${var.environment}"
+    Environment = var.environment
+  }
+}
+
+resource "aws_cloudwatch_metric_alarm" "bedrock_errors" {
+  alarm_name          = "household-bedrock-errors-${var.environment}"
+  comparison_operator = "GreaterThanThreshold"
+  evaluation_periods  = 1
+  metric_name         = "Invocations"
+  namespace           = "AWS/Bedrock"
+  period              = 3600
+  statistic           = "Sum"
+  threshold           = 100
+  alarm_description   = "Bedrock呼び出し回数が1時間で100回を超えました"
+  alarm_actions       = [aws_sns_topic.budget_alert.arn]
+
+  dimensions = {
+    ModelId = "jp.anthropic.claude-haiku-4-5-20251001-v1:0"
+  }
+
+  tags = {
+    Name        = "household-bedrock-errors-${var.environment}"
+    Environment = var.environment
+  }
 }

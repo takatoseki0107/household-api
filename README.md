@@ -43,9 +43,11 @@ pip install -r requirements.txt
 ### Lambdaパッケージのビルド
 
 ```bash
-cd lambda
-pip install -r ../requirements.txt -t .
-zip -r ../lambda.zip .
+mkdir -p build
+pip install -r requirements.txt -t build/
+cp lambda/main.py build/
+zip -r lambda.zip build/
+rm -rf build/
 ```
 
 ### インフラの構築
