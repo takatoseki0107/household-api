@@ -135,6 +135,7 @@ resource "aws_lambda_function" "household" {
   environment {
     variables = {
       SNS_TOPIC_ARN    = aws_sns_topic.budget_alert.arn
+      BEDROCK_MODEL_ID = "jp.anthropic.claude-haiku-4-5-20251001-v1:0"
       BUDGET_THRESHOLD = tostring(var.budget_threshold)
     }
   }
