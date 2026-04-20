@@ -359,7 +359,7 @@ resource "aws_cloudwatch_metric_alarm" "bedrock_invocations" {
   }
 
   tags = {
-    Name        = "household-bedrock-errors-${var.environment}"
+    Name        = "household-bedrock-invocations-${var.environment}"
     Environment = var.environment
   }
 }
