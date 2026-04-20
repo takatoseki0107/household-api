@@ -1,3 +1,4 @@
+import json
 import boto3
 import uuid
 from datetime import datetime, timezone
@@ -12,6 +13,7 @@ app = FastAPI()
 
 dynamodb = boto3.resource("dynamodb", region_name="ap-northeast-1")
 table = dynamodb.Table("household-transactions")
+bedrock = boto3.client("bedrock-runtime", region_name="ap-northeast-1")
 
 
 class Transaction(BaseModel):
@@ -41,8 +43,8 @@ def create_transaction(body: Transaction, request: Request):
     }
     try:
         table.put_item(Item=item)
-    except ClientError as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    except ClientError:
+        raise HTTPException(status_code=500, detail="サーバーエラーが発生しました")
     return {"message": "登録しました", "transactionId": item["transactionId"]}
 
 
@@ -53,8 +55,8 @@ def get_transactions(request: Request):
         response = table.query(
             KeyConditionExpression=boto3.dynamodb.conditions.Key("userId").eq(user_id)
         )
-    except ClientError as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    except ClientError:
+        raise HTTPException(status_code=500, detail="サーバーエラーが発生しました")
     items = response.get("Items", [])
     for item in items:
         item["amount"] = int(item["amount"])
@@ -68,8 +70,8 @@ def get_summary(request: Request):
         response = table.query(
             KeyConditionExpression=boto3.dynamodb.conditions.Key("userId").eq(user_id)
         )
-    except ClientError as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    except ClientError:
+        raise HTTPException(status_code=500, detail="サーバーエラーが発生しました")
     items = response.get("Items", [])
     income = sum(int(i["amount"]) for i in items if i["type"] == "income")
     expense = sum(int(i["amount"]) for i in items if i["type"] == "expense")
@@ -78,6 +80,54 @@ def get_summary(request: Request):
         "expense": expense,
         "balance": income - expense,
     }
+
+
+@app.get("/transactions/advice")
+def get_advice(request: Request):
+    user_id = get_user_id(request)
+    try:
+        response = table.query(
+            KeyConditionExpression=boto3.dynamodb.conditions.Key("userId").eq(user_id)
+        )
+    except ClientError:
+        raise HTTPException(status_code=500, detail="サーバーエラーが発生しました")
+
+    items = response.get("Items", [])
+    if not items:
+        return {"advice": "まずは収支を登録してみましょう"}
+
+    income = sum(int(i["amount"]) for i in items if i["type"] == "income")
+    expense = sum(int(i["amount"]) for i in items if i["type"] == "expense")
+    balance = income - expense
+
+    prompt = f"""あなたは家計管理のアドバイザーです。
+以下の家計データを分析して、日本語で簡潔なアドバイスを3点述べてください。
+
+収入合計: {income}円
+支出合計: {expense}円
+残高: {balance}円
+
+アドバイス:"""
+
+    try:
+        result = bedrock.invoke_model(
+            modelId="jp.anthropic.claude-haiku-4-5-20251001-v1:0",
+            contentType="application/json",
+            accept="application/json",
+            body=json.dumps({
+                "anthropic_version": "bedrock-2023-05-31",
+                "max_tokens": 512,
+                "messages": [
+                    {"role": "user", "content": prompt}
+                ]
+            })
+        )
+    except ClientError:
+        raise HTTPException(status_code=500, detail="サーバーエラーが発生しました")
+
+    body = json.loads(result["body"].read())
+    advice = body.get("content", [{}])[0].get("text", "アドバイスを生成できませんでした")
+    return {"advice": advice}
 
 
 handler = Mangum(app)
