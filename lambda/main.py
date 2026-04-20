@@ -1,4 +1,6 @@
 import json
+import logging
+import os
 import boto3
 import uuid
 from datetime import datetime, timezone
@@ -6,7 +8,6 @@ from fastapi import FastAPI, HTTPException, Request
 from mangum import Mangum
 from pydantic import BaseModel
 from typing import Optional, Literal
-from decimal import Decimal
 from botocore.exceptions import ClientError
 
 app = FastAPI()
@@ -14,6 +15,13 @@ app = FastAPI()
 dynamodb = boto3.resource("dynamodb", region_name="ap-northeast-1")
 table = dynamodb.Table("household-transactions")
 bedrock = boto3.client("bedrock-runtime", region_name="ap-northeast-1")
+sns = boto3.client("sns", region_name="ap-northeast-1")
+
+logger = logging.getLogger()
+logger.setLevel(logging.INFO)
+
+SNS_TOPIC_ARN = os.environ.get("SNS_TOPIC_ARN", "")
+BUDGET_THRESHOLD = int(os.environ.get("BUDGET_THRESHOLD") or "100000")
 
 
 class Transaction(BaseModel):
@@ -26,6 +34,25 @@ class Transaction(BaseModel):
 
 def get_user_id(request: Request) -> str:
     return request.scope["aws.event"]["requestContext"]["authorizer"]["jwt"]["claims"]["sub"]
+
+
+def check_and_notify_budget(user_id: str) -> None:
+    """予算チェックと SNS 通知"""
+    try:
+        response = table.query(
+            KeyConditionExpression=boto3.dynamodb.conditions.Key("userId").eq(user_id)
+        )
+        items = response.get("Items", [])
+        total_expense = sum(int(i["amount"]) for i in items if i["type"] == "expense")
+        if total_expense >= BUDGET_THRESHOLD and SNS_TOPIC_ARN:
+            sns.publish(
+                TopicArn=SNS_TOPIC_ARN,
+                Subject="【家計管理API】予算オーバーの通知",
+                Message=f"支出合計が予算({BUDGET_THRESHOLD:,}円)を超えました。\n現在の支出合計: {total_expense:,}円",
+            )
+            logger.info(f"予算オーバー通知を送信しました: user={user_id}, total={total_expense}")
+    except ClientError as e:
+        logger.error(f"予算チェック/SNS通知に失敗しました: user={user_id}, error={e}")
 
 
 @app.post("/transactions")
@@ -45,6 +72,10 @@ def create_transaction(body: Transaction, request: Request):
         table.put_item(Item=item)
     except ClientError:
         raise HTTPException(status_code=500, detail="サーバーエラーが発生しました")
+
+    if body.type == "expense":
+        check_and_notify_budget(user_id)
+
     return {"message": "登録しました", "transactionId": item["transactionId"]}
 
 

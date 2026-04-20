@@ -1,0 +1,7 @@
+# このファイルをコピーして terraform.tfvars を作成し、値を設定してください
+# cp terraform.tfvars.example terraform.tfvars
+
+alert_email = "your-email@example.com"
+
+# 本番環境ではフロントエンドのドメインを指定する
+# allowed_origins = ["https://your-frontend-domain.com"]

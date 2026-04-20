@@ -31,3 +31,5 @@ lambda/**/__pycache__*
 lambda/**/*.dist-info*
 lambda/idna*
 lambda/bin*
+*.tfvars
+!*.tfvars.example
