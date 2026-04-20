@@ -97,6 +97,8 @@ resource "aws_lambda_function" "household" {
   handler          = "main.handler"
   runtime          = "python3.12"
   source_code_hash = filebase64sha256("${path.module}/../lambda.zip")
+  timeout          = 30
+  memory_size      = 512
 
   tags = {
     Name        = "household-api-${var.environment}"
@@ -149,6 +151,7 @@ resource "aws_lambda_permission" "household" {
   principal     = "apigateway.amazonaws.com"
   source_arn    = "${aws_apigatewayv2_api.household.execution_arn}/*/*"
 }
+
 resource "aws_iam_policy" "lambda_dynamodb" {
   name = "household-lambda-dynamodb-policy-${var.environment}"
 
@@ -198,6 +201,7 @@ resource "aws_apigatewayv2_route" "get_transactions_summary" {
   authorization_type = "JWT"
   authorizer_id      = aws_apigatewayv2_authorizer.household.id
 }
+
 resource "aws_iam_policy" "lambda_bedrock" {
   name = "household-lambda-bedrock-policy-${var.environment}"
 
@@ -209,7 +213,7 @@ resource "aws_iam_policy" "lambda_bedrock" {
         Action = [
           "bedrock:InvokeModel"
         ]
-        Resource = "arn:aws:bedrock:ap-northeast-1::foundation-model/anthropic.claude-haiku-4-5-20251001"
+        Resource = "arn:aws:bedrock:ap-northeast-1:028973196612:inference-profile/jp.anthropic.claude-haiku-4-5-20251001-v1:0"
       }
     ]
   })
