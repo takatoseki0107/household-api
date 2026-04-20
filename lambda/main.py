@@ -22,7 +22,7 @@ logger.setLevel(logging.INFO)
 
 SNS_TOPIC_ARN = os.environ.get("SNS_TOPIC_ARN", "")
 BUDGET_THRESHOLD = int(os.environ.get("BUDGET_THRESHOLD") or "100000")
-BEDROCK_MODEL_ID = "jp.anthropic.claude-haiku-4-5-20251001-v1:0"
+BEDROCK_MODEL_ID = os.environ.get("BEDROCK_MODEL_ID", "jp.anthropic.claude-haiku-4-5-20251001-v1:0")
 
 # Could #13: プロンプトテンプレートを定数として管理
 ADVICE_PROMPT_TEMPLATE = """あなたは家計管理のアドバイザーです。
