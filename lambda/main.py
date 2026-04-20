@@ -36,13 +36,26 @@ def get_user_id(request: Request) -> str:
     return request.scope["aws.event"]["requestContext"]["authorizer"]["jwt"]["claims"]["sub"]
 
 
+def get_all_items(user_id: str) -> list:
+    """LastEvaluatedKey を使って全件取得（Issue #8 Should D: ペジネーション対応）"""
+    items = []
+    kwargs = {
+        "KeyConditionExpression": boto3.dynamodb.conditions.Key("userId").eq(user_id)
+    }
+    while True:
+        response = table.query(**kwargs)
+        items.extend(response.get("Items", []))
+        last_key = response.get("LastEvaluatedKey")
+        if not last_key:
+            break
+        kwargs["ExclusiveStartKey"] = last_key
+    return items
+
+
 def check_and_notify_budget(user_id: str) -> None:
     """予算チェックと SNS 通知"""
     try:
-        response = table.query(
-            KeyConditionExpression=boto3.dynamodb.conditions.Key("userId").eq(user_id)
-        )
-        items = response.get("Items", [])
+        items = get_all_items(user_id)
         total_expense = sum(int(i["amount"]) for i in items if i["type"] == "expense")
         if total_expense >= BUDGET_THRESHOLD and SNS_TOPIC_ARN:
             sns.publish(
@@ -83,12 +96,9 @@ def create_transaction(body: Transaction, request: Request):
 def get_transactions(request: Request):
     user_id = get_user_id(request)
     try:
-        response = table.query(
-            KeyConditionExpression=boto3.dynamodb.conditions.Key("userId").eq(user_id)
-        )
+        items = get_all_items(user_id)
     except ClientError:
         raise HTTPException(status_code=500, detail="サーバーエラーが発生しました")
-    items = response.get("Items", [])
     for item in items:
         item["amount"] = int(item["amount"])
     return {"transactions": items}
@@ -98,12 +108,9 @@ def get_transactions(request: Request):
 def get_summary(request: Request):
     user_id = get_user_id(request)
     try:
-        response = table.query(
-            KeyConditionExpression=boto3.dynamodb.conditions.Key("userId").eq(user_id)
-        )
+        items = get_all_items(user_id)
     except ClientError:
         raise HTTPException(status_code=500, detail="サーバーエラーが発生しました")
-    items = response.get("Items", [])
     income = sum(int(i["amount"]) for i in items if i["type"] == "income")
     expense = sum(int(i["amount"]) for i in items if i["type"] == "expense")
     return {
@@ -117,13 +124,10 @@ def get_summary(request: Request):
 def get_advice(request: Request):
     user_id = get_user_id(request)
     try:
-        response = table.query(
-            KeyConditionExpression=boto3.dynamodb.conditions.Key("userId").eq(user_id)
-        )
+        items = get_all_items(user_id)
     except ClientError:
         raise HTTPException(status_code=500, detail="サーバーエラーが発生しました")
 
-    items = response.get("Items", [])
     if not items:
         return {"advice": "まずは収支を登録してみましょう"}
 
