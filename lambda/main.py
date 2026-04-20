@@ -166,7 +166,6 @@ def get_advice(request: Request):
     if summary["income"] == 0 and summary["expense"] == 0:
         return {"advice": "まずは収支を登録してみましょう"}
 
-    # Could #13: テンプレートから prompt を生成
     prompt = ADVICE_PROMPT_TEMPLATE.format(
         months=summary["months"],
         income=f'{summary["income"]:,}',
@@ -176,8 +175,9 @@ def get_advice(request: Request):
     )
 
     try:
-        # Must 1: API Gateway HTTP API はストリーミング非対応のため invoke_model を使用
-        result = bedrock.invoke_model(
+        # jp. inference profile は invoke_model_with_response_stream を使用
+        # Lambda内で全チャンク結合してから返却する設計
+        response = bedrock.invoke_model_with_response_stream(
             modelId=BEDROCK_MODEL_ID,
             contentType="application/json",
             accept="application/json",
@@ -189,11 +189,15 @@ def get_advice(request: Request):
                 ]
             })
         )
+        advice_parts = []
+        for event in response["body"]:
+            chunk = json.loads(event["chunk"]["bytes"])
+            if chunk.get("type") == "content_block_delta":
+                advice_parts.append(chunk["delta"].get("text", ""))
+        advice = "".join(advice_parts) or "アドバイスを生成できませんでした"
     except ClientError:
         raise HTTPException(status_code=500, detail="サーバーエラーが発生しました")
 
-    body = json.loads(result["body"].read())
-    advice = body.get("content", [{}])[0].get("text", "アドバイスを生成できませんでした")
     return {"advice": advice}
 
 

@@ -263,7 +263,8 @@ resource "aws_iam_policy" "lambda_bedrock" {
       {
         Effect = "Allow"
         Action = [
-          "bedrock:InvokeModel"
+          "bedrock:InvokeModel",
+          "bedrock:InvokeModelWithResponseStream"
         ]
         Resource = [
           "arn:aws:bedrock:ap-northeast-1:${data.aws_caller_identity.current.account_id}:inference-profile/jp.anthropic.claude-haiku-4-5-20251001-v1:0",
@@ -391,4 +392,28 @@ resource "aws_sns_topic_subscription" "ops_alert_email" {
   topic_arn = aws_sns_topic.ops_alert.arn
   protocol  = "email"
   endpoint  = var.alert_email
+}
+
+resource "aws_iam_policy" "lambda_marketplace" {
+  name = "household-lambda-marketplace-policy-${var.environment}"
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "aws-marketplace:ViewSubscriptions",
+          "aws-marketplace:Subscribe",
+          "aws-marketplace:Unsubscribe"
+        ]
+        Resource = "*"
+      }
+    ]
+  })
+}
+
+resource "aws_iam_role_policy_attachment" "lambda_marketplace" {
+  role       = aws_iam_role.lambda.name
+  policy_arn = aws_iam_policy.lambda_marketplace.arn
 }
