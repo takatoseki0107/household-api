@@ -3,7 +3,7 @@ import logging
 import os
 import boto3
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from fastapi import FastAPI, HTTPException, Request
 from mangum import Mangum
 from pydantic import BaseModel
@@ -36,13 +36,45 @@ def get_user_id(request: Request) -> str:
     return request.scope["aws.event"]["requestContext"]["authorizer"]["jwt"]["claims"]["sub"]
 
 
+def get_all_items(user_id: str) -> list:
+    """LastEvaluatedKey を使って全件取得（Should D: ペジネーション対応）"""
+    items = []
+    kwargs = {
+        "KeyConditionExpression": boto3.dynamodb.conditions.Key("userId").eq(user_id)
+    }
+    for _ in range(100):
+        try:
+            response = table.query(**kwargs)
+        except ClientError as e:
+            logger.error(f"DynamoDB query に失敗しました: user={user_id}, error={e}")
+            raise
+        items.extend(response.get("Items", []))
+        last_key = response.get("LastEvaluatedKey")
+        if not last_key:
+            break
+        kwargs["ExclusiveStartKey"] = last_key
+    return items
+
+
+def get_recent_summary(user_id: str, months: int = 3) -> dict:
+    """直近N ヶ月の集計データのみ返す（Bedrock コスト削減）"""
+    items = get_all_items(user_id)
+    cutoff = (datetime.now(timezone.utc) - timedelta(days=months * 30)).strftime("%Y-%m-%d")
+    recent = [i for i in items if i.get("date", "") >= cutoff]
+    income = sum(int(i["amount"]) for i in recent if i["type"] == "income")
+    expense = sum(int(i["amount"]) for i in recent if i["type"] == "expense")
+    return {
+        "income": income,
+        "expense": expense,
+        "balance": income - expense,
+        "months": months,
+    }
+
+
 def check_and_notify_budget(user_id: str) -> None:
     """予算チェックと SNS 通知"""
     try:
-        response = table.query(
-            KeyConditionExpression=boto3.dynamodb.conditions.Key("userId").eq(user_id)
-        )
-        items = response.get("Items", [])
+        items = get_all_items(user_id)
         total_expense = sum(int(i["amount"]) for i in items if i["type"] == "expense")
         if total_expense >= BUDGET_THRESHOLD and SNS_TOPIC_ARN:
             sns.publish(
@@ -83,12 +115,9 @@ def create_transaction(body: Transaction, request: Request):
 def get_transactions(request: Request):
     user_id = get_user_id(request)
     try:
-        response = table.query(
-            KeyConditionExpression=boto3.dynamodb.conditions.Key("userId").eq(user_id)
-        )
+        items = get_all_items(user_id)
     except ClientError:
         raise HTTPException(status_code=500, detail="サーバーエラーが発生しました")
-    items = response.get("Items", [])
     for item in items:
         item["amount"] = int(item["amount"])
     return {"transactions": items}
@@ -98,12 +127,9 @@ def get_transactions(request: Request):
 def get_summary(request: Request):
     user_id = get_user_id(request)
     try:
-        response = table.query(
-            KeyConditionExpression=boto3.dynamodb.conditions.Key("userId").eq(user_id)
-        )
+        items = get_all_items(user_id)
     except ClientError:
         raise HTTPException(status_code=500, detail="サーバーエラーが発生しました")
-    items = response.get("Items", [])
     income = sum(int(i["amount"]) for i in items if i["type"] == "income")
     expense = sum(int(i["amount"]) for i in items if i["type"] == "expense")
     return {
@@ -117,26 +143,19 @@ def get_summary(request: Request):
 def get_advice(request: Request):
     user_id = get_user_id(request)
     try:
-        response = table.query(
-            KeyConditionExpression=boto3.dynamodb.conditions.Key("userId").eq(user_id)
-        )
+        summary = get_recent_summary(user_id, months=3)
     except ClientError:
         raise HTTPException(status_code=500, detail="サーバーエラーが発生しました")
 
-    items = response.get("Items", [])
-    if not items:
+    if summary["income"] == 0 and summary["expense"] == 0:
         return {"advice": "まずは収支を登録してみましょう"}
 
-    income = sum(int(i["amount"]) for i in items if i["type"] == "income")
-    expense = sum(int(i["amount"]) for i in items if i["type"] == "expense")
-    balance = income - expense
-
     prompt = f"""あなたは家計管理のアドバイザーです。
-以下の家計データを分析して、日本語で簡潔なアドバイスを3点述べてください。
+以下の直近{summary["months"]}ヶ月の家計データを分析して、日本語で簡潔なアドバイスを3点述べてください。
 
-収入合計: {income}円
-支出合計: {expense}円
-残高: {balance}円
+収入合計: {summary["income"]:,}円
+支出合計: {summary["expense"]:,}円
+残高: {summary["balance"]:,}円
 
 アドバイス:"""
 

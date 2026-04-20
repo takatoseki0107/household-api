@@ -54,6 +54,8 @@ resource "aws_cognito_user_pool" "household" {
 
   auto_verified_attributes = ["email"]
 
+  deletion_protection = var.environment == "prod" ? "ACTIVE" : "INACTIVE"
+
   verification_message_template {
     default_email_option = "CONFIRM_WITH_CODE"
     email_subject        = "【家計管理API】メールアドレスの確認"
@@ -81,6 +83,16 @@ resource "aws_cognito_user_pool" "household" {
 resource "aws_cognito_user_pool_client" "household" {
   name         = "household-app-client"
   user_pool_id = aws_cognito_user_pool.household.id
+
+  access_token_validity  = 60
+  id_token_validity      = 60
+  refresh_token_validity = 30
+
+  token_validity_units {
+    access_token  = "minutes"
+    id_token      = "minutes"
+    refresh_token = "days"
+  }
 
   explicit_auth_flows = [
     "ALLOW_USER_SRP_AUTH",
