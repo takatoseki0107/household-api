@@ -54,7 +54,7 @@ resource "aws_cognito_user_pool" "household" {
 
   auto_verified_attributes = ["email"]
 
-  deletion_protection = "ACTIVE"
+  deletion_protection = var.environment == "prod" ? "ACTIVE" : "INACTIVE"
 
   verification_message_template {
     default_email_option = "CONFIRM_WITH_CODE"
