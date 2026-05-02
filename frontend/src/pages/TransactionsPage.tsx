@@ -101,7 +101,7 @@ export function TransactionsPage() {
   }
 
   return (
-    <div className="px-8 py-8 max-w-5xl mx-auto">
+    <div className="px-4 py-6 md:px-8 md:py-8 max-w-5xl mx-auto">
       <h1 className="text-xl font-bold mb-6" style={{ color: '#3D1F0F' }}>収支管理</h1>
 
       <div className="flex flex-col lg:flex-row gap-6">
@@ -241,7 +241,7 @@ export function TransactionsPage() {
                       {['日付', 'カテゴリ', '種別', '金額'].map(h => (
                         <th
                           key={h}
-                          className="px-5 py-3 text-left text-xs font-semibold"
+                          className="px-5 py-3 text-left text-xs font-semibold whitespace-nowrap"
                           style={{ color: '#9A6050' }}
                         >
                           {h}
@@ -255,15 +255,15 @@ export function TransactionsPage() {
                         key={tx.transactionId}
                         style={{ borderTop: i === 0 ? 'none' : '1px solid #F5EAE0' }}
                       >
-                        <td className="px-5 py-3.5 text-xs" style={{ color: '#7A4A30' }}>
+                        <td className="px-5 py-3.5 text-xs whitespace-nowrap" style={{ color: '#7A4A30' }}>
                           {tx.date.slice(0, 10)}
                         </td>
-                        <td className="px-5 py-3.5 font-medium" style={{ color: '#3D1F0F' }}>
+                        <td className="px-5 py-3.5 font-medium whitespace-nowrap" style={{ color: '#3D1F0F' }}>
                           {tx.category}
                         </td>
-                        <td className="px-5 py-3.5">
+                        <td className="px-5 py-3.5 whitespace-nowrap">
                           <span
-                            className="px-2.5 py-0.5 rounded-full text-xs font-semibold"
+                            className="px-2.5 py-0.5 rounded-full text-xs font-semibold whitespace-nowrap"
                             style={{
                               backgroundColor: tx.type === 'income' ? '#FEF3DC' : '#FEE8E0',
                               color: tx.type === 'income' ? '#B07A00' : '#C0392B',
@@ -273,7 +273,7 @@ export function TransactionsPage() {
                           </span>
                         </td>
                         <td
-                          className="px-5 py-3.5 font-bold text-right"
+                          className="px-5 py-3.5 font-bold text-right whitespace-nowrap"
                           style={{ color: tx.type === 'income' ? '#EF9F27' : '#D85A30' }}
                         >
                           {tx.type === 'expense' ? '−' : '+'}¥{tx.amount.toLocaleString('ja-JP')}
