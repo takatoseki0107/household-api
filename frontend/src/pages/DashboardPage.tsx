@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
-import { useAuth } from '../contexts/AuthContext'
+import { useAuth } from '../contexts/useAuth'
 
 const API_URL = import.meta.env.VITE_API_URL
 
@@ -51,6 +51,25 @@ function SummaryCard({ label, amount, color }: { label: string; amount: number; 
   )
 }
 
+function buildChartData(transactions: Transaction[]): MonthlyBar[] {
+  const now = new Date()
+  const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+
+  const monthly = transactions
+    .filter(tx => tx.date.startsWith(currentMonth))
+    .reduce<Record<string, { 収入: number; 支出: number }>>((acc, tx) => {
+      const day = tx.date.slice(0, 10)
+      if (!acc[day]) acc[day] = { 収入: 0, 支出: 0 }
+      if (tx.type === 'income') acc[day].収入 += tx.amount
+      else acc[day].支出 += tx.amount
+      return acc
+    }, {})
+
+  return Object.entries(monthly)
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([date, values]) => ({ date: date.slice(5), ...values }))
+}
+
 export function DashboardPage() {
   const { idToken } = useAuth()
   const [summary, setSummary] = useState<Summary | null>(null)
@@ -58,12 +77,7 @@ export function DashboardPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  useEffect(() => {
-    if (!idToken) return
-    fetchData()
-  }, [idToken])
-
-  async function fetchData() {
+  const fetchData = useCallback(async () => {
     setIsLoading(true)
     setError(null)
     try {
@@ -86,26 +100,12 @@ export function DashboardPage() {
     } finally {
       setIsLoading(false)
     }
-  }
+  }, [idToken])
 
-  function buildChartData(transactions: Transaction[]): MonthlyBar[] {
-    const now = new Date()
-    const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
-
-    const monthly = transactions
-      .filter(tx => tx.date.startsWith(currentMonth))
-      .reduce<Record<string, { 収入: number; 支出: number }>>((acc, tx) => {
-        const day = tx.date.slice(0, 10)
-        if (!acc[day]) acc[day] = { 収入: 0, 支出: 0 }
-        if (tx.type === 'income') acc[day].収入 += tx.amount
-        else acc[day].支出 += tx.amount
-        return acc
-      }, {})
-
-    return Object.entries(monthly)
-      .sort(([a], [b]) => a.localeCompare(b))
-      .map(([date, values]) => ({ date: date.slice(5), ...values }))
-  }
+  useEffect(() => {
+    if (!idToken) return
+    void fetchData()
+  }, [idToken, fetchData])
 
   return (
     <div className="px-8 py-8 max-w-4xl mx-auto">

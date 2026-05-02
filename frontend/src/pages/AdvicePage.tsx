@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react'
-import { useAuth } from '../contexts/AuthContext'
+import { useCallback, useEffect, useState } from 'react'
+import { useAuth } from '../contexts/useAuth'
 
 const API_URL = import.meta.env.VITE_API_URL
 
@@ -21,11 +21,7 @@ export function AdvicePage() {
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  useEffect(() => {
-    if (idToken) fetchAdvice()
-  }, [idToken])
-
-  async function fetchAdvice() {
+  const fetchAdvice = useCallback(async () => {
     setIsLoading(true)
     setError(null)
     try {
@@ -40,7 +36,11 @@ export function AdvicePage() {
     } finally {
       setIsLoading(false)
     }
-  }
+  }, [idToken])
+
+  useEffect(() => {
+    if (idToken) void fetchAdvice()
+  }, [idToken, fetchAdvice])
 
   return (
     <div className="px-8 py-8 max-w-2xl mx-auto">
