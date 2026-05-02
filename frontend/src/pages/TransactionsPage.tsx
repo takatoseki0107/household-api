@@ -108,7 +108,7 @@ export function TransactionsPage() {
         {/* 登録フォーム */}
         <div className="lg:w-72 flex-shrink-0">
           <div
-            className="rounded-2xl p-6 shadow-sm"
+            className="rounded-2xl p-4 md:p-6 shadow-sm"
             style={{ backgroundColor: '#fff', border: '1px solid #F0D8C8' }}
           >
             <h2 className="text-sm font-bold mb-5" style={{ color: '#3D1F0F' }}>収支を登録</h2>
