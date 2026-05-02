@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react'
-import { useAuth } from '../contexts/AuthContext'
+import { useCallback, useEffect, useState } from 'react'
+import { useAuth } from '../contexts/useAuth'
 
 const API_URL = import.meta.env.VITE_API_URL
 
@@ -45,11 +45,7 @@ export function TransactionsPage() {
   const [category, setCategory] = useState(CATEGORIES[0])
   const [date, setDate] = useState(today())
 
-  useEffect(() => {
-    if (idToken) fetchTransactions()
-  }, [idToken])
-
-  async function fetchTransactions() {
+  const fetchTransactions = useCallback(async () => {
     setIsLoading(true)
     setFetchError(null)
     try {
@@ -67,7 +63,11 @@ export function TransactionsPage() {
     } finally {
       setIsLoading(false)
     }
-  }
+  }, [idToken])
+
+  useEffect(() => {
+    if (idToken) void fetchTransactions()
+  }, [idToken, fetchTransactions])
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
