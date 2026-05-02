@@ -18,9 +18,9 @@ export function Layout() {
 
   return (
     <div className="flex min-h-screen">
-      {/* サイドバー */}
+      {/* サイドバー（PC: md以上のみ表示） */}
       <aside
-        className="w-56 flex flex-col flex-shrink-0"
+        className="hidden md:flex w-56 flex-col flex-shrink-0"
         style={{ backgroundColor: '#3D1F0F' }}
       >
         {/* ロゴ */}
@@ -67,9 +67,43 @@ export function Layout() {
       </aside>
 
       {/* メインエリア */}
-      <main className="flex-1 overflow-auto" style={{ backgroundColor: '#FDF6F0' }}>
+      <main
+        className="flex-1 overflow-auto pb-16 md:pb-0"
+        style={{ backgroundColor: '#FDF6F0' }}
+      >
         <Outlet />
       </main>
+
+      {/* ボトムナビ（スマホ: md未満のみ表示） */}
+      <nav
+        className="md:hidden fixed bottom-0 left-0 right-0 flex items-center border-t z-50"
+        style={{ backgroundColor: '#3D1F0F', borderColor: '#5C3317' }}
+      >
+        {NAV_ITEMS.map(({ to, label, icon }) => (
+          <NavLink
+            key={to}
+            to={to}
+            className={({ isActive }) =>
+              `flex-1 flex flex-col items-center justify-center py-2 gap-0.5 text-xs font-medium transition-colors ${
+                isActive ? 'text-white' : 'text-orange-200'
+              }`
+            }
+            style={({ isActive }) =>
+              isActive ? { color: '#EF9F27' } : undefined
+            }
+          >
+            <span className="text-xl">{icon}</span>
+            {label}
+          </NavLink>
+        ))}
+        <button
+          onClick={handleSignOut}
+          className="flex-1 flex flex-col items-center justify-center py-2 gap-0.5 text-xs font-medium text-orange-200 transition-colors"
+        >
+          <span className="text-xl">🚪</span>
+          ログアウト
+        </button>
+      </nav>
     </div>
   )
 }
