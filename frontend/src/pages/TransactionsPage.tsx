@@ -180,16 +180,18 @@ export function TransactionsPage() {
                 <label className="block text-xs font-semibold mb-1.5" style={{ color: '#7A4A30' }}>
                   日付
                 </label>
-                <input
-                  type="date"
-                  value={date}
-                  onChange={e => setDate(e.target.value)}
-                  required
-                  className="w-full max-w-full px-4 py-3 rounded-xl text-sm outline-none transition"
-                  style={{ backgroundColor: '#FDF6F0', border: '1.5px solid #E8C9B0', color: '#3D1F0F', boxSizing: 'border-box' }}
-                  onFocus={e => (e.currentTarget.style.borderColor = '#D85A30')}
-                  onBlur={e => (e.currentTarget.style.borderColor = '#E8C9B0')}
-                />
+                <div className="overflow-hidden rounded-xl" style={{ border: '1.5px solid #E8C9B0' }}>
+                  <input
+                    type="date"
+                    value={date}
+                    onChange={e => setDate(e.target.value)}
+                    required
+                    className="w-full px-4 py-3 text-sm outline-none transition"
+                    style={{ backgroundColor: '#FDF6F0', color: '#3D1F0F', border: 'none', display: 'block' }}
+                    onFocus={e => (e.currentTarget.parentElement!.style.borderColor = '#D85A30')}
+                    onBlur={e => (e.currentTarget.parentElement!.style.borderColor = '#E8C9B0')}
+                  />
+                </div>
               </div>
 
               {formError && (
