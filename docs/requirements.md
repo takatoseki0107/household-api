@@ -141,8 +141,6 @@ flowchart TD
 | 収支サマリーカード | 収入合計・支出合計・残高を3枚のカードで表示（`GET /transactions/summary`） |
 | 月別グラフ | 月ごとの収入・支出棒グラフ（recharts） |
 | 最近の取引リスト | 直近5〜10件の収支を日付降順で表示（`GET /transactions`） |
-| AIアドバイスバナー | 最新のAIアドバイスをサマリー表示（`GET /transactions/advice`） |
-| 収支登録ボタン | 収支登録モーダルまたは登録画面へ遷移 |
 
 ---
 
