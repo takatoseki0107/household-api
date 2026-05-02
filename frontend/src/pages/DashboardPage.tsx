@@ -146,14 +146,8 @@ export function DashboardPage() {
                 <BarChart data={chartData} margin={{ top: 4, right: 16, left: 0, bottom: 4 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#F0D8C8" />
                   <XAxis dataKey="date" tick={{ fontSize: 11, fill: '#9A6050' }} />
-                  <YAxis tick={{ fontSize: 11, fill: '#9A6050' }} tickFormatter={v => `¥${(v / 1000).toFixed(0)}k`} />
-                  <Tooltip
-                    formatter={(value: number | string | undefined | null) => {
-                      if (value === undefined || value === null) return '';
-                      return `¥${Number(value).toLocaleString()}`;
-                    }}
-                    contentStyle={{ borderRadius: 12, border: '1px solid #F0D8C8', fontSize: 12 }}
-                  />
+                  <YAxis tick={{ fontSize: 11, fill: '#9A6050' }} tickFormatter={(value) => `¥${value.toLocaleString()}`} />
+                  <Tooltip contentStyle={{ borderRadius: 12, border: '1px solid #F0D8C8', fontSize: 12 }} />
                   <Legend wrapperStyle={{ fontSize: 12 }} />
                   <Bar dataKey="収入" fill="#EF9F27" radius={[4, 4, 0, 0]} />
                   <Bar dataKey="支出" fill="#D85A30" radius={[4, 4, 0, 0]} />
