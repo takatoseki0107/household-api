@@ -5,8 +5,8 @@ import { useAuth } from '../contexts/AuthContext'
 const API_URL = import.meta.env.VITE_API_URL
 
 type Summary = {
-  total_income: number
-  total_expense: number
+  income: number
+  expense: number
   balance: number
 }
 
@@ -124,8 +124,8 @@ export function DashboardPage() {
         <>
           {/* サマリーカード */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
-            <SummaryCard label="収入" amount={summary?.total_income ?? 0} color="#EF9F27" />
-            <SummaryCard label="支出" amount={summary?.total_expense ?? 0} color="#D85A30" />
+            <SummaryCard label="収入" amount={summary?.income ?? 0} color="#EF9F27" />
+            <SummaryCard label="支出" amount={summary?.expense ?? 0} color="#D85A30" />
             <SummaryCard label="残高" amount={summary?.balance ?? 0} color="#3D1F0F" />
           </div>
 
