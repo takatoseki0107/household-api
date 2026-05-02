@@ -108,7 +108,7 @@ export function TransactionsPage() {
         {/* 登録フォーム */}
         <div className="lg:w-72 flex-shrink-0">
           <div
-            className="rounded-2xl p-4 md:p-6 shadow-sm"
+            className="rounded-2xl p-4 md:p-6 shadow-sm overflow-hidden"
             style={{ backgroundColor: '#fff', border: '1px solid #F0D8C8' }}
           >
             <h2 className="text-sm font-bold mb-5" style={{ color: '#3D1F0F' }}>収支を登録</h2>
@@ -185,8 +185,8 @@ export function TransactionsPage() {
                   value={date}
                   onChange={e => setDate(e.target.value)}
                   required
-                  className="w-full px-4 py-3 rounded-xl text-sm outline-none transition"
-                  style={{ backgroundColor: '#FDF6F0', border: '1.5px solid #E8C9B0', color: '#3D1F0F' }}
+                  className="w-full max-w-full px-4 py-3 rounded-xl text-sm outline-none transition"
+                  style={{ backgroundColor: '#FDF6F0', border: '1.5px solid #E8C9B0', color: '#3D1F0F', boxSizing: 'border-box' }}
                   onFocus={e => (e.currentTarget.style.borderColor = '#D85A30')}
                   onBlur={e => (e.currentTarget.style.borderColor = '#E8C9B0')}
                 />
