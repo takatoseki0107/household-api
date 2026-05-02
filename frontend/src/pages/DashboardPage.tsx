@@ -148,7 +148,7 @@ export function DashboardPage() {
                   <XAxis dataKey="date" tick={{ fontSize: 11, fill: '#9A6050' }} />
                   <YAxis tick={{ fontSize: 11, fill: '#9A6050' }} tickFormatter={v => `¥${(v / 1000).toFixed(0)}k`} />
                   <Tooltip
-                    formatter={(value: number) => `¥${value.toLocaleString('ja-JP')}`}
+                    formatter={(value: number | string) => typeof value === 'number' ? `¥${value.toLocaleString('ja-JP')}` : value}
                     contentStyle={{ borderRadius: 12, border: '1px solid #F0D8C8', fontSize: 12 }}
                   />
                   <Legend wrapperStyle={{ fontSize: 12 }} />
